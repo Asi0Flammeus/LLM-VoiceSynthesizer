@@ -6,22 +6,18 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Load environment variables
 load_dotenv()
-ELVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
-CHUNK_SIZE = 1024
+ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
+
+if not ELEVENLABS_API_KEY:
+    print("API key is not loaded correctly.")
+    exit()
 
 # Voice Character
 voice_ids = {
     "Rogzy": "RmicS1jU3ei6Vxlpkqj4",
-    "Giacomo": "gFpPxLJAJCez7afCJ8Pd",
-    "David St-onge": "0PfKe742JfrBvOr7Gyx9",
-    "Fanis": "HIRH46f2SFLDptj86kJG",
-    "Loic": "hOYgbRZsrkPHWJ2kdEIu",
-    "Mogenet": "ld8UrJoCOHSibD1DlYXB",
-    "Pantamis": "naFOP0Eb03OaLMVhdCxd",
-    "Renaud": "UVJB9VPhLrNHNsH4ZatL",
-    "es-question": "5K2SjAdgoClKG1acJ17G",
-    "en-question": "ER8xHNz0kNywE1Pc5ogG"
+
 }
+
 
 # List voices for user selection
 print("Available Voices:")
@@ -36,27 +32,18 @@ VOICE_ID = voice_ids[voice_list[voice_index]]
 project_path = Path('./projects/')
 project_folders = [f.name for f in project_path.iterdir() if f.is_dir()]
 
-print("\nAvailable Project Folders:")
-for i, folder in enumerate(project_folders):
-    print(f"{i+1}. {folder}")
+# Headers configuration
+HEADERS = {
+    "Accept": "application/json",
+    "xi-api-key": ELEVENLABS_API_KEY,
+    "Content-Type": "application/json"
+}
 
-folder_index = int(input("Enter the number to select a project folder: ")) - 1
-selected_folder = project_folders[folder_index]
-
-# Define base path
-input_folder = project_path / selected_folder
-
-# Function to process text to speech
-def process_text_to_speech(text_file):
+# Define function for text-to-speech processing
+def text_to_speech(text_file):
     text_to_speak = text_file.read_text()
     output_path = text_file.with_suffix(".mp3")
-
-    # URL and headers for TTS API request
     tts_url = f"https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}/stream"
-    headers = {
-        "Accept": "application/json",
-        "xi-apikey": ELVENLABS_API_KEY
-    }
     data = {
         "text": text_to_speak,
         "model_id": "eleven_multilingual_v2",
@@ -67,33 +54,30 @@ def process_text_to_speech(text_file):
             "use_speaker_boost": True
         }
     }
-
-    # Make the API request
-    response = requests.post(tts_url, headers=headers, json=data, stream=True)
+    response = requests.post(tts_url, headers=HEADERS, json=data, stream=True)
     if response.ok:
         with open(output_path, "wb") as f:
-            for chunk in response.iter_content(chunk_size=CHUNK_SIZE):
+            for chunk in response.iter_content(chunk_size=1024):
                 f.write(chunk)
         print(f"Audio stream saved successfully to {output_path}")
     else:
-        print(response.text)
+        raise Exception(f"API Request Failed: {response.text}")
 
-# Parallel execution setup
-def run_parallel_text_to_speech():
-    # Determine the number of workers based on the number of project subfolders
-    num_workers = len(project_folders)
+# Parallel execution across files in a selected folder
+def run_parallel_text_to_speech(folder_path):
     file_patterns = ["*_transcript_English.txt", "*_transcript_Spanish.txt"]
-    with ThreadPoolExecutor(max_workers=num_workers) as executor:
-        futures = []
-        for folder in project_folders:
-            folder_path = project_path / folder
-            for pattern in file_patterns:
-                for text_file in folder_path.rglob(pattern):
-                    futures.append(executor.submit(process_text_to_speech, text_file))
-
+    text_files = [text_file for pattern in file_patterns for text_file in folder_path.rglob(pattern)]
+    with ThreadPoolExecutor(max_workers=len(project_folders)) as executor:
+        futures = {executor.submit(text_to_speech, text_file): text_file for text_file in text_files}
         for future in as_completed(futures):
-            future.result()  # This will raise exceptions if any occurred during processing
+            try:
+                future.result()
+            except Exception as e:
+                print(e)
 
-# Execute the parallel processing
-run_parallel_text_to_speech()
+# Process each project folder in parallel
+for folder in project_folders:
+    folder_path = project_path / folder
+    print(f"Processing folder: {folder}")
+    run_parallel_text_to_speech(folder_path)
 
