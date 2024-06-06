@@ -67,7 +67,7 @@ def text_to_speech(text_file):
             "use_speaker_boost": True
         }
     }
-    response = requests.post(tts_url, headers=HEADERS, json=data, stream=True)
+    response = requests.post(tts_url, headers=HEADERS, json=data, stream=False)
     if response.ok:
         with open(output_path, "wb") as f:
             for chunk in response.iter_content(chunk_size=1024):
