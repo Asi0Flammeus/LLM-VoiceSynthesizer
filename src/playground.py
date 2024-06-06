@@ -15,10 +15,16 @@ if not ELEVENLABS_API_KEY:
 # Voice Character
 voice_ids = {
     "Rogzy": "RmicS1jU3ei6Vxlpkqj4",
-
+    "Giacomo": "gFpPxLJAJCez7afCJ8Pd",
+    "David St-onge": "0PfKe742JfrBvOr7Gyx9",
+    "Fanis": "HIRH46f2SFLDptj86kJG",
+    "Loic": "hOYgbRZsrkPHWJ2kdEIu",
+    "Mogenet": "ld8UrJoCOHSibD1DlYXB",
+    "Pantamis": "naFOP0Eb03OaLMVhdCxd",
+    "Renaud": "UVJB9VPhLrNHNsH4ZatL",
+    "es-question": "5K2SjAdgoClKG1acJ17G",
+    "en-question": "ER8xHNz0kNywE1Pc5ogG"
 }
-
-
 # List voices for user selection
 print("Available Voices:")
 for i, voice in enumerate(voice_ids.keys()):
@@ -31,6 +37,13 @@ VOICE_ID = voice_ids[voice_list[voice_index]]
 # List project folders
 project_path = Path('./projects/')
 project_folders = [f.name for f in project_path.iterdir() if f.is_dir()]
+
+print("\nAvailable Project Folders:")
+for i, folder in enumerate(project_folders):
+    print(f"{i+1}. {folder}")
+
+folder_index = int(input("Enter the number to select a project folder: ")) - 1
+selected_folder = project_folders[folder_index]
 
 # Headers configuration
 HEADERS = {
@@ -63,11 +76,13 @@ def text_to_speech(text_file):
     else:
         raise Exception(f"API Request Failed: {response.text}")
 
-# Parallel execution across files in a selected folder
-def run_parallel_text_to_speech(folder_path):
+# Function to process a single selected folder
+def process_selected_folder(folder_name):
+    folder_path = project_path / folder_name
     file_patterns = ["*_transcript_English.txt", "*_transcript_Spanish.txt"]
     text_files = [text_file for pattern in file_patterns for text_file in folder_path.rglob(pattern)]
-    with ThreadPoolExecutor(max_workers=len(project_folders)) as executor:
+    max_workers = min(15, len(text_files))  # Set the max workers to 15 or the number of files if less than 15
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {executor.submit(text_to_speech, text_file): text_file for text_file in text_files}
         for future in as_completed(futures):
             try:
@@ -75,9 +90,6 @@ def run_parallel_text_to_speech(folder_path):
             except Exception as e:
                 print(e)
 
-# Process each project folder in parallel
-for folder in project_folders:
-    folder_path = project_path / folder
-    print(f"Processing folder: {folder}")
-    run_parallel_text_to_speech(folder_path)
+# Call function to process the selected folder
+process_selected_folder(selected_folder)
 
