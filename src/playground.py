@@ -2,6 +2,7 @@ import os
 import requests
 from pathlib import Path
 from dotenv import load_dotenv
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Load environment variables
 load_dotenv()
@@ -54,7 +55,7 @@ def process_text_to_speech(text_file):
     tts_url = f"https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}/stream"
     headers = {
         "Accept": "application/json",
-        "xi-api-key": ELVENLABS_API_KEY
+        "xi-apikey": ELVENLABS_API_KEY
     }
     data = {
         "text": text_to_speak,
@@ -77,9 +78,22 @@ def process_text_to_speech(text_file):
     else:
         print(response.text)
 
-# Process each text file in the folder and all subfolders
-file_patterns = ["*_transcript_English.txt", "*_transcript_Spanish.txt"]
-for pattern in file_patterns:
-    for text_file in input_folder.rglob(pattern):
-        process_text_to_speech(text_file)
+# Parallel execution setup
+def run_parallel_text_to_speech():
+    # Determine the number of workers based on the number of project subfolders
+    num_workers = len(project_folders)
+    file_patterns = ["*_transcript_English.txt", "*_transcript_Spanish.txt"]
+    with ThreadPoolExecutor(max_workers=num_workers) as executor:
+        futures = []
+        for folder in project_folders:
+            folder_path = project_path / folder
+            for pattern in file_patterns:
+                for text_file in folder_path.rglob(pattern):
+                    futures.append(executor.submit(process_text_to_speech, text_file))
+
+        for future in as_completed(futures):
+            future.result()  # This will raise exceptions if any occurred during processing
+
+# Execute the parallel processing
+run_parallel_text_to_speech()
 
