@@ -24,7 +24,8 @@ voice_ids = {
     "Renaud": "UVJB9VPhLrNHNsH4ZatL",
     "es-question": "5K2SjAdgoClKG1acJ17G",
     "en-question": "ER8xHNz0kNywE1Pc5ogG"
-}
+        }
+
 # List voices for user selection
 print("Available Voices:")
 for i, voice in enumerate(voice_ids.keys()):
@@ -52,10 +53,23 @@ HEADERS = {
     "Content-Type": "application/json"
 }
 
+# Calculate API cost based on the total number of characters in text files
+def calculate_api_cost(folder_name):
+    folder_path = project_path / folder_name
+    text_files = [text_file for text_file in folder_path.rglob("*.txt")]
+    total_characters = 0
+    for text_file in text_files:
+        output_path = text_file.with_suffix(".mp3")
+        if not output_path.exists():
+            total_characters += len(text_file.read_text())
+    cost = total_characters / 1000 * 0.18
+    print(f"Estimated cost for API usage: {cost:.2f}€")
+    return cost
+
+
 # Define function for text-to-speech processing
 def text_to_speech(text_file):
     output_path = text_file.with_suffix(".mp3")
-    # Check if output file already exists
     if output_path.exists():
         print(f"Skipping {output_path}, file already exists.")
         return
@@ -82,17 +96,20 @@ def text_to_speech(text_file):
 
 # Function to process a single selected folder
 def process_selected_folder(folder_name):
-    folder_path = project_path / folder_name
-    file_patterns = ["*_transcript_English.txt", "*_transcript_Spanish.txt"]
-    text_files = [text_file for pattern in file_patterns for text_file in folder_path.rglob(pattern)]
-    max_workers = min(15, len(text_files))  # Set the max workers to 15 or the number of files if less than 15
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {executor.submit(text_to_speech, text_file): text_file for text_file in text_files}
-        for future in as_completed(futures):
-            try:
-                future.result()
-            except Exception as e:
-                print(e)
+    cost = calculate_api_cost(folder_name)
+    proceed = input("Do you want to proceed with the text-to-speech conversion? (yes/no): ")
+    if proceed.lower() == 'yes':
+        folder_path = project_path / folder_name
+        file_patterns = ["*_transcript_English.txt", "*_transcript_Spanish.txt"]
+        text_files = [text_file for pattern in file_patterns for text_file in folder_path.rglob(pattern)]
+        max_workers = min(15, len(text_files))
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(text_to_speech, text_file): text_file for text_file in text_files}
+            for future in as_completed(futures):
+                try:
+                    future.result()
+                except Exception as e:
+                    print(e)
 
 # Call function to process the selected folder
 process_selected_folder(selected_folder)
