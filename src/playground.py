@@ -54,8 +54,12 @@ HEADERS = {
 
 # Define function for text-to-speech processing
 def text_to_speech(text_file):
-    text_to_speak = text_file.read_text()
     output_path = text_file.with_suffix(".mp3")
+    # Check if output file already exists
+    if output_path.exists():
+        print(f"Skipping {output_path}, file already exists.")
+        return
+    text_to_speak = text_file.read_text()
     tts_url = f"https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}/stream"
     data = {
         "text": text_to_speak,
